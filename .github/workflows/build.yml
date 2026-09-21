@@ -1,0 +1,67 @@
+name: Build Docker artifact
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/build.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-artifact-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: dsh
+  DSH_VERSION: 0.1.6-alpha.2
+  DSH_COMMIT: ddefc45fbc7f8e46dd73185e68295696d1297887
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build image
+        run: |
+          set -eux
+          docker build \
+            --pull=false \
+            --platform linux/amd64 \
+            --build-arg DSH_COMMIT="${DSH_COMMIT}" \
+            --build-arg DSH_VERSION="${DSH_VERSION}" \
+            --tag "${IMAGE_NAME}:${DSH_VERSION}" \
+            .
+
+      - name: Smoke test
+        run: |
+          set -eux
+          docker run --rm "${IMAGE_NAME}:${DSH_VERSION}" --version
+
+      - name: Export image
+        run: |
+          set -eux
+          mkdir -p dist
+          docker save "${IMAGE_NAME}:${DSH_VERSION}" \
+            | gzip -9 > "dist/deepseek-harness-${DSH_VERSION}-linux-amd64.tar.gz"
+          sha256sum "dist/deepseek-harness-${DSH_VERSION}-linux-amd64.tar.gz" \
+            > "dist/deepseek-harness-${DSH_VERSION}-linux-amd64.tar.gz.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: deepseek-harness-${{ env.DSH_VERSION }}-linux-amd64
+          path: |
+            dist/deepseek-harness-${{ env.DSH_VERSION }}-linux-amd64.tar.gz
+            dist/deepseek-harness-${{ env.DSH_VERSION }}-linux-amd64.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 14
