@@ -34,9 +34,6 @@ LABEL org.opencontainers.image.title="DeepSeek Harness" \
       org.opencontainers.image.version="${DSH_VERSION}" \
       org.opencontainers.image.revision="${DSH_COMMIT}"
 
-RUN corepack enable \
- && corepack prepare "pnpm@${PNPM_VERSION}" --activate
-
 COPY --from=build --chown=node:node /opt/deepseek-harness /opt/deepseek-harness
 
 WORKDIR /workspace
