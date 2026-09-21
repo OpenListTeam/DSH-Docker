@@ -28,8 +28,6 @@ FROM ${NODE_IMAGE} AS runtime
 
 ARG DSH_COMMIT=ddefc45fbc7f8e46dd73185e68295696d1297887
 ARG DSH_VERSION=0.1.6-alpha.2
-ARG PNPM_VERSION=11.7.0
-
 LABEL org.opencontainers.image.title="DeepSeek Harness" \
       org.opencontainers.image.description="Frozen DeepSeek Harness Docker build" \
       org.opencontainers.image.source="https://github.com/OpenListTeam/DSH-Docker" \
@@ -47,5 +45,5 @@ USER node
 ENV HOME=/home/node \
     NODE_ENV=production
 
-ENTRYPOINT ["pnpm", "--dir", "/opt/deepseek-harness", "dsh"]
+ENTRYPOINT ["node", "/opt/deepseek-harness/apps/cli/lib/bin.js"]
 CMD ["--help"]
