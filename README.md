@@ -2,7 +2,12 @@
 
 Build a frozen Docker image for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
 
-This repository does **not** publish images to GHCR, Docker Hub, or any package registry. GitHub Actions only builds the image, exports it with `docker save`, and uploads the resulting archive as a workflow artifact.
+GitHub Actions builds the image exactly once, then derives two outputs from that single build:
+
+- a `docker save` archive uploaded as a workflow artifact;
+- a published image on GHCR: `ghcr.io/openlistteam/dsh-docker`.
+
+Nothing is published to Docker Hub.
 
 ## Frozen inputs
 
@@ -15,6 +20,8 @@ This repository does **not** publish images to GHCR, Docker Hub, or any package 
 - `actions/upload-artifact`: `v7.0.1`, pinned to `043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`
 
 The Docker build checks out the exact upstream commit and runs `pnpm install --frozen-lockfile`, so the dependency graph is taken from that immutable upstream lockfile.
+
+GHCR login uses the built-in `GITHUB_TOKEN` through the plain `docker login` CLI, so the workflow adds no further third-party actions and requires no extra repository secret.
 
 ## Build locally
 
@@ -51,11 +58,13 @@ docker run --rm -it \
   dsh:0.1.6-alpha.2 web --no-open
 ```
 
-## CI artifact
+## CI: artifact and GHCR
 
-Run the "Build Docker artifact" workflow manually, or push changes affecting the Docker build/workflow.
+Run the "Build and publish Docker image" workflow manually, or push changes affecting the Docker build/workflow on `main`.
 
-The workflow produces:
+The image is built once at `linux/amd64` and smoke-tested with `--version` before anything is published.
+
+### Workflow artifact
 
 ```text
 deepseek-harness-0.1.6-alpha.2-linux-amd64.tar.gz
@@ -66,6 +75,28 @@ Load it with:
 ```sh
 gzip -dc deepseek-harness-0.1.6-alpha.2-linux-amd64.tar.gz | docker load
 ```
+
+### GHCR image
+
+Tags pushed for each published build:
+
+| Tag | Meaning |
+| --- | --- |
+| `0.1.6-alpha.2` | frozen DeepSeek Harness version |
+| `sha-<short>` | commit that produced the build |
+| `latest` | most recent build from `main` |
+
+```sh
+docker pull ghcr.io/openlistteam/dsh-docker:0.1.6-alpha.2
+```
+
+The workflow only authenticates and pushes when the run is on `main` (a push to `main`, or a manual dispatch from `main`). Builds from other refs still produce the artifact but never touch the registry, so a work-in-progress branch can never move `latest`.
+
+Notes and limitations:
+
+- Only `linux/amd64` is published, matching the single-platform build above.
+- The push uses the local Docker daemon rather than Buildx, so the image carries no BuildKit provenance/SBOM attestations. The OCI labels baked into the Dockerfile (`source`, `version`, `revision`) still link the package to this repository.
+- The package is created on the first successful push. Set its visibility (public/private) in the package settings on GitHub; if the owning organization restricts package creation via `GITHUB_TOKEN`, fall back to a PAT with `write:packages`.
 
 ## Security note
 
